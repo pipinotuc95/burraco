@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Burraco · Statistiche</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♠</text></svg>">
+</head>
+<body data-page="statistiche">
+  <header id="site-header"></header>
+  <main>
+    <div class="page-title">
+      <h2>Statistiche</h2>
+      <p>Classifiche di giocatori e coppie. Clicca sulle intestazioni per ordinare.</p>
+    </div>
+    <div id="content"></div>
+  </main>
+  <script src="assets/common.js"></script>
+  <script>
+  (function () {
+    const list = Store.all();
+    const root = $('#content');
+    if (!list.length) { root.innerHTML = `<div class="panel">${emptyState('Ancora nessuna partita registrata.')}</div>`; return; }
+
+    const players = statsByPlayer(list);
+    const teams = statsByTeam(list);
+    let best = null, totBurraci = 0, totPunti = 0, maxDiff = null;
+    list.forEach(g => {
+      ['A', 'B'].forEach(s => {
+        const sd = side(g, s);
+        totBurraci += sd.puliti + sd.sporchi;
+        totPunti += sd.punti;
+        if (!best || sd.punti > best.punti) best = sd;
+      });
+      const d = Math.abs(g.puntiA - g.puntiB);
+      if (!maxDiff || d > maxDiff.d) maxDiff = { d, g };
+    });
+    const topPlayer = [...players].filter(p => p.g >= 1).sort((a, b) => b.winPct - a.winPct || b.v - a.v)[0];
+    const topTeam = [...teams].sort((a, b) => b.v - a.v || b.winPct - a.winPct)[0];
+
+    const kpi = (suit, red, label, value, sub) => `<div class="kpi"><span class="k-suit ${red ? 'red' : 'black'}">${suit}</span>
+      <div class="k-label">${label}</div><div class="k-value">${value}</div><div class="k-sub">${sub || ''}</div></div>`;
+
+    root.innerHTML = `
+      <div class="kpis">
+        ${kpi('♥', 1, 'Partite giocate', fmt(list.length), `${players.length} giocatori · ${teams.length} coppie`)}
+        ${kpi('♠', 0, 'Miglior giocatore', esc(topPlayer.label), `${topPlayer.winPct}% vittorie su ${topPlayer.g} partite`)}
+        ${kpi('♦', 1, 'Coppia più vincente', esc(topTeam.label), `${topTeam.v} vittorie su ${topTeam.g}`)}
+        ${kpi('♣', 0, 'Punteggio record', fmt(best.punti), `${esc(teamName(best.players))} · ${fmtDate(best.game.data)}`)}
+        ${kpi('♥', 1, 'Media punti per coppia', fmt(totPunti / (list.length * 2)), 'a partita')}
+        ${kpi('★', 1, 'Burraci totali', fmt(totBurraci), `vittoria più netta: +${fmt(maxDiff.d)}`)}
+      </div>
+      <div class="panel" data-suit="♠"><h3>Classifica giocatori</h3><div id="t-players"></div></div>
+      <div class="panel suit-red" data-suit="♦"><h3>Classifica coppie</h3><div id="t-teams"></div></div>
+      <div class="panel" data-suit="♣"><h3>Partite per mese</h3><div id="t-months"></div></div>`;
+
+    const cols = [
+      { key: 'label', label: 'Nome', render: r => `<b>${esc(r.label)}</b>` },
+      { key: 'g', label: 'G', num: 1, title: 'Partite giocate' },
+      { key: 'v', label: 'V', num: 1, title: 'Vittorie' },
+      { key: 'p', label: 'P', num: 1, title: 'Sconfitte' },
+      { key: 'n', label: 'N', num: 1, title: 'Pareggi' },
+      { key: 'winPct', label: '% Vitt.', num: 1, render: r => `${r.winPct}%<span class="meter"><span style="width:${r.winPct}%"></span></span>` },
+      { key: 'media', label: 'Media punti', num: 1, render: r => fmt(r.media) },
+      { key: 'diff', label: 'Diff. media', num: 1, render: r => `<span style="color:${r.diff >= 0 ? 'var(--win)' : 'var(--lose)'}">${r.diff >= 0 ? '+' : ''}${fmt(r.diff)}</span>` },
+      { key: 'max', label: 'Record', num: 1, render: r => fmt(r.max) },
+      { key: 'puliti', label: 'B. puliti', num: 1 },
+      { key: 'sporchi', label: 'B. sporchi', num: 1 },
+      { key: 'chiusure', label: 'Chiusure', num: 1 },
+      { key: 'forma', label: 'Ultime 5', sortable: false, render: r => formDots(r.forma) }
+    ];
+    sortableTable($('#t-players'), players, cols, 'winPct');
+    sortableTable($('#t-teams'), teams, cols, 'v');
+
+    // per mese
+    const months = new Map();
+    list.forEach(g => {
+      const k = (g.data || '').slice(0, 7);
+      if (!months.has(k)) months.set(k, { k, g: 0, punti: 0 });
+      const m = months.get(k); m.g++; m.punti += g.puntiA + g.puntiB;
+    });
+    const ms = [...months.values()].sort((a, b) => b.k.localeCompare(a.k));
+    const maxG = Math.max(...ms.map(m => m.g));
+    const nomeMese = k => { const [y, m] = k.split('-'); return new Date(y, m - 1, 1).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' }); };
+    $('#t-months').innerHTML = `<div class="table-wrap"><table><thead><tr><th>Mese</th><th class="num">Partite</th><th></th><th class="num">Punti medi a partita</th></tr></thead><tbody>
+      ${ms.map(m => `<tr><td style="text-transform:capitalize">${nomeMese(m.k)}</td><td class="num">${m.g}</td>
+        <td style="width:40%"><span class="meter" style="width:100%;margin:0"><span style="width:${pct(m.g, maxG)}%"></span></span></td>
+        <td class="num">${fmt(m.punti / m.g)}</td></tr>`).join('')}
+    </tbody></table></div>`;
+  })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Burraco · Nuova partita</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90' fill='%23c62828'>♥</text></svg>">
+</head>
+<body data-page="nuova">
+  <header id="site-header"></header>
+  <main>
+    <div class="page-title">
+      <h2 id="form-title">Nuova partita</h2>
+      <p>Inserisci giocatori, smazzate e punteggio finale.</p>
+    </div>
+
+    <form id="game-form" autocomplete="off">
+      <div class="panel suit-red" data-suit="♥">
+        <h3>Il tavolo</h3>
+        <div class="row">
+          <div class="field"><label for="data">Data</label><input type="date" id="data" required></div>
+          <div class="field"><label for="luogo">Luogo (opzionale)</label><input id="luogo" placeholder="es. Circolo, casa di Marco…"></div>
+          <div class="field"><label for="obiettivo">Si gioca ai</label><input type="number" id="obiettivo" value="2005" step="5"></div>
+        </div>
+
+        <div class="grid-2">
+          <div class="team-box team-a">
+            <h4><span class="black">♠</span> Coppia A</h4>
+            <div class="field"><label>Giocatore 1</label><input class="player" id="a1" list="players" required placeholder="Nome"></div>
+            <div class="field"><label>Giocatore 2</label><input class="player" id="a2" list="players" placeholder="Nome (vuoto se 1 contro 1)"></div>
+          </div>
+          <div class="team-box team-b">
+            <h4><span class="red">♥</span> Coppia B</h4>
+            <div class="field"><label>Giocatore 1</label><input class="player" id="b1" list="players" required placeholder="Nome"></div>
+            <div class="field"><label>Giocatore 2</label><input class="player" id="b2" list="players" placeholder="Nome (vuoto se 1 contro 1)"></div>
+          </div>
+        </div>
+        <datalist id="players"></datalist>
+      </div>
+
+      <div class="panel" data-suit="♠">
+        <h3>Smazzate</h3>
+        <p class="hint" style="margin:-4px 0 12px 14px">Aggiungi i punti di ogni smazzata: il totale si calcola da solo. Se preferisci, lascia vuoto e inserisci direttamente il totale qui sotto.</p>
+        <div class="table-wrap">
+          <table class="hands">
+            <thead><tr><th>#</th><th class="num">Punti A</th><th class="num">Punti B</th><th class="num">Progressivo</th><th></th></tr></thead>
+            <tbody id="hands-body"></tbody>
+          </table>
+        </div>
+        <div class="btn-row" style="margin-top:12px">
+          <button type="button" class="btn ghost small" id="add-hand">+ Aggiungi smazzata</button>
+        </div>
+      </div>
+
+      <div class="panel suit-red" data-suit="♦">
+        <h3>Risultato</h3>
+        <div class="grid-2">
+          <div class="team-box team-a">
+            <h4><span class="black">♠</span> <span class="lbl-a">Coppia A</span></h4>
+            <div class="field"><label>Punteggio totale</label><input type="number" id="puntiA" required step="5"></div>
+            <div class="row">
+              <div class="field"><label>Burraci puliti</label><input type="number" id="pulitiA" min="0" value="0"></div>
+              <div class="field"><label>Burraci sporchi</label><input type="number" id="sporchiA" min="0" value="0"></div>
+            </div>
+          </div>
+          <div class="team-box team-b">
+            <h4><span class="red">♥</span> <span class="lbl-b">Coppia B</span></h4>
+            <div class="field"><label>Punteggio totale</label><input type="number" id="puntiB" required step="5"></div>
+            <div class="row">
+              <div class="field"><label>Burraci puliti</label><input type="number" id="pulitiB" min="0" value="0"></div>
+              <div class="field"><label>Burraci sporchi</label><input type="number" id="sporchiB" min="0" value="0"></div>
+            </div>
+          </div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <div class="field"><label for="chiusura">Chi ha chiuso l'ultima smazzata</label>
+            <select id="chiusura"><option value="">—</option><option value="A">Coppia A</option><option value="B">Coppia B</option></select>
+          </div>
+          <div class="field"><label for="note">Note</label><input id="note" placeholder="Annotazioni sulla partita"></div>
+        </div>
+
+        <div class="preview" id="preview"></div>
+
+        <div class="btn-row">
+          <button type="submit" class="btn gold" id="save-btn">♛ Salva partita</button>
+          <button type="button" class="btn ghost" id="reset-btn">Svuota</button>
+          <a class="btn ghost" href="partite.html" id="cancel-edit" hidden>Annulla modifica</a>
+        </div>
+      </div>
+    </form>
+  </main>
+
+  <script src="assets/common.js"></script>
+  <script src="assets/nuova.js"></script>
+</body>
+</html>

@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Burraco · Partite</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90' fill='%23c62828'>♦</text></svg>">
+</head>
+<body data-page="partite">
+  <header id="site-header"></header>
+  <main>
+    <div class="page-title">
+      <h2>Tutte le partite</h2>
+      <p id="count"></p>
+    </div>
+
+    <div class="panel suit-red" data-suit="♦">
+      <div class="toolbar">
+        <div class="field"><label for="q">Cerca giocatore o luogo</label><input id="q" placeholder="es. Marco"></div>
+        <div class="field" style="max-width:180px"><label for="dal">Dal</label><input type="date" id="dal"></div>
+        <div class="field" style="max-width:180px"><label for="al">Al</label><input type="date" id="al"></div>
+      </div>
+      <div id="list"></div>
+    </div>
+
+    <div class="panel" data-suit="♣">
+      <h3>Backup dei dati</h3>
+      <p class="hint" style="margin:0 0 12px 14px">Le partite sono salvate solo in questo browser. Esporta un file per conservarle o per caricarle su un altro dispositivo.</p>
+      <div class="btn-row" style="padding-left:14px">
+        <button class="btn" id="export">⇩ Esporta JSON</button>
+        <button class="btn ghost" id="export-csv">⇩ Esporta CSV</button>
+        <label class="btn ghost" style="margin:0;text-transform:none;letter-spacing:0;font-size:inherit;color:var(--ink)">⇧ Importa JSON<input type="file" id="import" accept=".json,application/json" hidden></label>
+        <button class="btn ghost" id="demo">♣ Carica partite di esempio</button>
+        <button class="btn danger" id="wipe">Elimina tutto</button>
+      </div>
+    </div>
+  </main>
+
+  <script src="assets/common.js"></script>
+  <script>
+  (function () {
+    if (new URLSearchParams(location.search).get('saved')) setTimeout(() => toast('Modifiche salvate ♛'), 300);
+
+    function draw() {
+      const all = Store.all();
+      const q = norm($('#q').value), dal = $('#dal').value, al = $('#al').value;
+      const list = sortByDate(all).filter(g => {
+        if (dal && g.data < dal) return false;
+        if (al && g.data > al) return false;
+        if (!q) return true;
+        return [...g.a, ...g.b, g.luogo, g.note].some(s => norm(s).includes(q));
+      });
+      $('#count').textContent = `${list.length} di ${all.length} partite`;
+      if (!all.length) { $('#list').innerHTML = emptyState('Nessuna partita registrata. Inseriscine una o carica gli esempi qui sotto.'); return; }
+      if (!list.length) { $('#list').innerHTML = `<p class="empty">Nessuna partita corrisponde ai filtri.</p>`; return; }
+
+      $('#list').innerHTML = list.map(g => {
+        const w = winner(g);
+        const hands = (g.smazzate || []);
+        let ta = 0, tb = 0;
+        return `<div class="match" data-id="${g.id}">
+          <div class="m-date"><b>${fmtDate(g.data)}</b>${esc(g.luogo || '')}</div>
+          <div class="m-team ${w === 'A' ? 'winner' : ''}">${esc(teamName(g.a))}<small>${g.pulitiA || 0} puliti · ${g.sporchiA || 0} sporchi${g.chiusura === 'A' ? ' · chiusura' : ''}</small></div>
+          <div class="score">${fmt(g.puntiA)} – ${fmt(g.puntiB)}</div>
+          <div class="m-team right ${w === 'B' ? 'winner' : ''}">${esc(teamName(g.b))}<small>${g.pulitiB || 0} puliti · ${g.sporchiB || 0} sporchi${g.chiusura === 'B' ? ' · chiusura' : ''}</small></div>
+          <div class="match-actions">
+            <button class="btn ghost small" data-act="toggle" title="Dettagli">⋯</button>
+            <a class="btn ghost small" href="index.html?edit=${g.id}">Modifica</a>
+            <button class="btn danger small" data-act="del">Elimina</button>
+          </div>
+          <div class="match-detail">
+            ${w === 'X' ? '<b>Pareggio</b>' : `<b>Vince ${esc(teamName(w === 'A' ? g.a : g.b))}</b> di ${fmt(Math.abs(g.puntiA - g.puntiB))} punti`}
+            ${g.obiettivo ? ` · si giocava ai ${fmt(g.obiettivo)}` : ''}
+            ${g.note ? `<br>📝 ${esc(g.note)}` : ''}
+            ${hands.length ? `<div class="table-wrap" style="margin-top:8px"><table><thead><tr><th>Smazzata</th><th class="num">${esc(teamName(g.a))}</th><th class="num">${esc(teamName(g.b))}</th><th class="num">Progressivo</th></tr></thead><tbody>
+              ${hands.map((h, i) => { ta += h.a; tb += h.b; return `<tr><td>${i + 1}</td><td class="num">${fmt(h.a)}</td><td class="num">${fmt(h.b)}</td><td class="num">${fmt(ta)} – ${fmt(tb)}</td></tr>`; }).join('')}
+            </tbody></table></div>` : '<br><span class="hint">Smazzate non registrate.</span>'}
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    $('#list').addEventListener('click', e => {
+      const b = e.target.closest('[data-act]');
+      if (!b) return;
+      const m = b.closest('.match');
+      if (b.dataset.act === 'toggle') m.classList.toggle('open');
+      if (b.dataset.act === 'del' && confirm('Eliminare questa partita?')) { Store.remove(m.dataset.id); draw(); toast('Partita eliminata'); }
+    });
+    ['q', 'dal', 'al'].forEach(id => $('#' + id).addEventListener('input', draw));
+
+    function download(name, text, type) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([text], { type }));
+      a.download = name; a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
+    $('#export').onclick = () => download(`burraco-${today()}.json`, JSON.stringify(Store.all(), null, 2), 'application/json');
+    $('#export-csv').onclick = () => {
+      const rows = [['data', 'luogo', 'coppiaA_1', 'coppiaA_2', 'coppiaB_1', 'coppiaB_2', 'puntiA', 'puntiB', 'pulitiA', 'sporchiA', 'pulitiB', 'sporchiB', 'chiusura', 'note']];
+      sortByDate(Store.all(), false).forEach(g => rows.push([g.data, g.luogo, g.a[0], g.a[1], g.b[0], g.b[1], g.puntiA, g.puntiB, g.pulitiA, g.sporchiA, g.pulitiB, g.sporchiB, g.chiusura, g.note]));
+      download(`burraco-${today()}.csv`, rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';')).join('\n'), 'text/csv');
+    };
+    $('#import').onchange = async e => {
+      const f = e.target.files[0]; if (!f) return;
+      try {
+        const data = JSON.parse(await f.text());
+        if (!Array.isArray(data)) throw new Error();
+        const cur = Store.all(); const ids = new Set(cur.map(g => g.id));
+        let added = 0;
+        data.forEach(g => { if (g && g.id && Array.isArray(g.a) && Array.isArray(g.b) && !ids.has(g.id)) { cur.push(g); added++; } });
+        Store.save(cur); draw(); toast(`${added} partite importate`);
+      } catch (err) { toast('File non valido'); }
+      e.target.value = '';
+    };
+    $('#wipe').onclick = () => { if (confirm('Eliminare TUTTE le partite? Fai prima un backup!')) { Store.save([]); draw(); } };
+
+    $('#demo').onclick = () => {
+      const P = ['Marco', 'Giulia', 'Luca', 'Sara', 'Paolo', 'Anna'];
+      const pairs = [[['Marco', 'Giulia'], ['Luca', 'Sara']], [['Marco', 'Giulia'], ['Paolo', 'Anna']], [['Luca', 'Paolo'], ['Sara', 'Anna']], [['Marco', 'Luca'], ['Giulia', 'Sara']], [['Paolo', 'Anna'], ['Luca', 'Sara']]];
+      const cur = Store.all();
+      const r = (a, b) => Math.round((a + Math.random() * (b - a)) / 5) * 5;
+      for (let i = 0; i < 24; i++) {
+        const [a, b] = pairs[i % pairs.length];
+        const d = new Date(); d.setDate(d.getDate() - (24 - i) * 4);
+        const smazzate = []; let ta = 0, tb = 0;
+        while (ta < 2005 && tb < 2005) { const h = { a: r(-150, 1100), b: r(-150, 1100) }; smazzate.push(h); ta += h.a; tb += h.b; }
+        cur.push({
+          id: uid(), creato: Date.now() + i, data: d.toISOString().slice(0, 10), luogo: i % 3 ? 'Circolo' : 'Casa', obiettivo: 2005,
+          a: [...a], b: [...b], puntiA: ta, puntiB: tb,
+          pulitiA: r(0, 15) / 5 | 0, sporchiA: r(0, 20) / 5 | 0, pulitiB: r(0, 15) / 5 | 0, sporchiB: r(0, 20) / 5 | 0,
+          chiusura: ta > tb ? 'A' : 'B', note: '', smazzate
+        });
+      }
+      Store.save(cur); draw(); toast('24 partite di esempio caricate');
+    };
+
+    draw();
+  })();
+  </script>
+</body>
+</html>
